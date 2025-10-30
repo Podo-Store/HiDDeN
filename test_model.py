@@ -4,6 +4,7 @@ import argparse
 import os
 import numpy as np
 from options import HiDDenConfiguration
+import hashlib
 
 import utils
 from model.hidden import *
@@ -36,6 +37,10 @@ def main():
                         help='The image to watermark')
     # parser.add_argument('--times', '-t', default=10, type=int,
     #                     help='Number iterations (insert watermark->extract).')
+    parser.add_argument('--message-int', type=str, required=False,
+                        help='Integer value to encode as message bits (auto-detects base like 0x..., 0b...)')
+    parser.add_argument('--use-hash', action='store_true',
+                        help='Hash the provided --message-int string with SHA-256 and map to message_length bits')
 
     args = parser.parse_args()
 
@@ -54,8 +59,31 @@ def main():
     image_tensor.unsqueeze_(0)
 
     # for t in range(args.times):
-    message = torch.Tensor(np.random.choice([0, 1], (image_tensor.shape[0],
-                                                    hidden_config.message_length))).to(device)
+    L = hidden_config.message_length
+    B = image_tensor.shape[0]
+    if args.message_int is not None:
+        if args.use_hash:
+            h = hashlib.sha256(args.message_int.encode('utf-8')).digest()
+            bits = []
+            for b in h:
+                for i in range(7, -1, -1):
+                    bits.append((b >> i) & 1)
+            if len(bits) < L:
+                bits = bits + [0] * (L - len(bits))
+            else:
+                bits = bits[:L]
+            message = torch.tensor(bits, dtype=torch.float32, device=device).unsqueeze(0).expand(B, -1)
+        else:
+            try:
+                val = int(args.message_int, 0)
+            except Exception:
+                val = int(args.message_int)
+            mask = (1 << L) - 1
+            val = val & mask
+            bits = [(val >> i) & 1 for i in range(L - 1, -1, -1)]
+            message = torch.tensor(bits, dtype=torch.float32, device=device).unsqueeze(0).expand(B, -1)
+    else:
+        message = torch.Tensor(np.random.choice([0, 1], (B, L))).to(device)
     losses, (encoded_images, noised_images, decoded_messages) = hidden_net.validate_on_batch([image_tensor, message])
     decoded_rounded = decoded_messages.detach().cpu().numpy().round().clip(0, 1)
     message_detached = message.detach().cpu().numpy()
