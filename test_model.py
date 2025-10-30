@@ -40,9 +40,9 @@ def main():
     args = parser.parse_args()
 
     train_options, hidden_config, noise_config = utils.load_options(args.options_file)
-    noiser = Noiser(noise_config)
+    noiser = Noiser(noise_config, device)
 
-    checkpoint = torch.load(args.checkpoint_file)
+    checkpoint = torch.load(args.checkpoint_file, map_location=device)
     hidden_net = Hidden(hidden_config, device, noiser, None)
     utils.model_from_checkpoint(hidden_net, checkpoint)
 
