@@ -90,6 +90,23 @@ def main():
     print('original: {}'.format(message_detached))
     print('decoded : {}'.format(decoded_rounded))
     print('error : {:.3f}'.format(np.mean(np.abs(decoded_rounded - message_detached))))
+    decoded_bits = decoded_rounded.astype(np.int32)
+    orig_bits = message_detached.astype(np.int32)
+    mismatch = (decoded_bits != orig_bits).astype(np.int32)
+    mismatch_idx = np.where(mismatch[0] == 1)[0]
+    print('mismatch_count: {} / {}'.format(int(mismatch.sum()), orig_bits.shape[1]))
+    print('mismatch_idx  : {}'.format(mismatch_idx.tolist()))
+    s_orig = ''.join(str(x) for x in orig_bits[0].tolist())
+    s_dec = ''.join(str(x) for x in decoded_bits[0].tolist())
+    s_mark = ''.join('^' if m == 1 else ' ' for m in mismatch[0].tolist())
+    print('orig_bits:', s_orig)
+    print('dec_bits :', s_dec)
+    print('marker   :', s_mark)
+    if args.message_int is not None and not args.use_hash:
+        orig_val = int(s_orig, 2)
+        dec_val = int(s_dec, 2)
+        print('orig_int(masked {}b): {}'.format(L, orig_val))
+        print('dec_int(masked {}b) : {}'.format(L, dec_val))
     utils.save_images(image_tensor.cpu(), encoded_images.cpu(), 'test', '.', resize_to=(256, 256))
 
     # bitwise_avg_err = np.sum(np.abs(decoded_rounded - message.detach().cpu().numpy()))/(image_tensor.shape[0] * messages.shape[1])
